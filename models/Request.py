@@ -97,7 +97,7 @@ class Request:
         return {}
 
     @staticmethod
-    async def validate_generate_audio_request(args, version, isOpenAI=False):
+    def validate_generate_audio_request(args, version, isOpenAI=False):
 
         args.setdefault('response_format', 'url')
         args.setdefault('speed', 1.0)
@@ -185,7 +185,7 @@ class Request:
         return {}
     
     @staticmethod
-    async def validate_generate_audio_v1_params(args):
+    def validate_generate_audio_v1_params(args):
 
         #args.setdefault('voice', SPEAKERS[0])
         args.setdefault('voice', 'raw')
@@ -224,7 +224,7 @@ class Request:
         return {}
     
     @staticmethod
-    async def validate_generate_audio_v2_params(args):
+    def validate_generate_audio_v2_params(args):
 
         #args.setdefault('voice', SPEAKERS[0])
         args.setdefault('voice', 'raw')

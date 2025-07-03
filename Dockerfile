@@ -9,21 +9,23 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir app
 
-RUN pip3 install git+https://github.com/myshell-ai/MeloTTS.git@main \
- && pip3 install git+https://github.com/myshell-ai/OpenVoice.git@main \
- && pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 \
+WORKDIR /app
+
+RUN pip3 install --no-cache-dir git+https://github.com/myshell-ai/MeloTTS.git@main \
+ && pip3 install --no-cache-dir git+https://github.com/myshell-ai/OpenVoice.git@main \
+ && pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 \
  && pip3 install --no-cache-dir 'nvidia-cudnn-cu11<9.0.0' --index-url https://download.pytorch.org/whl/nightly \
- && pip3 install --no-cache-dir gradio==3.48.0
+ && pip3 install --no-cache-dir gradio==3.48.0 \
+ && git clone --depth=1 https://huggingface.co/myshell-ai/OpenVoiceV2 \
+ && git clone --depth=1 https://huggingface.co/myshell-ai/OpenVoice \
+ && ln -s /app/OpenVoiceV2 /app/OpenVoice/checkpoints_v2 \
+ && python -m unidic download
+
 
 COPY . /app
 
-WORKDIR /app
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-RUN git clone https://huggingface.co/myshell-ai/OpenVoiceV2 \
- && git clone https://huggingface.co/myshell-ai/OpenVoice \
- && pip3 install --no-cache-dir -r requirements.txt \
- && ln -s /app/OpenVoiceV2 /app/OpenVoice/checkpoints_v2 \
- && python -m unidic download
 
 EXPOSE 5000
 

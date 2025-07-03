@@ -31,7 +31,7 @@ class Voice:
         return source_se
     
     @staticmethod
-    async def tts_v2(args, output_file, device):
+    def tts_v2(args, output_file, device):
     
         raw_lang = args.get('model')
         language = raw_lang.upper()
@@ -56,7 +56,7 @@ class Voice:
         return source_se
 
     #@staticmethod
-    async def convert(src_file, output_file, src_se, tgt_se, converter):
+    def convert(src_file, output_file, src_se, tgt_se, converter):
 
         converter.convert(
             audio_src_path=src_file, 
@@ -68,7 +68,7 @@ class Voice:
         return True
     
     #@staticmethod
-    async def build_source_se(args, version, device):
+    def build_source_se(args, version, device):
 
         if version == 'v1':
             raw_lang = args.get('model')

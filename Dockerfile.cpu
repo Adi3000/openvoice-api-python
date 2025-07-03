@@ -4,28 +4,30 @@ ENV USE_VAD=true
 ENV DEVICE_V1=cpu
 ENV DEVICE_V2=cpu
 
+RUN mkdir app
+COPY . /app
+WORKDIR /app
+
 RUN apt-get update \ 
     && apt-get install -y git git-lfs curl python3 python3-pip ffmpeg libmagic1 build-essential libsndfile1 \
     && curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
     && git lfs install \
     && ln -s /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir app
-
-RUN pip3 install git+https://github.com/myshell-ai/MeloTTS.git@main \
- && pip3 install git+https://github.com/myshell-ai/OpenVoice.git@main \
- && pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu \
- && pip3 install --no-cache-dir gradio==3.48.0
-
-COPY . /app
-
-WORKDIR /app
-
-RUN git clone https://huggingface.co/myshell-ai/OpenVoiceV2 \
- && git clone https://huggingface.co/myshell-ai/OpenVoice \
- && pip3 install --no-cache-dir -r requirements.txt \
- && ln -s /app/OpenVoiceV2 /app/OpenVoice/checkpoints_v2 \
- && python -m unidic download
+    && pip3 install git+https://github.com/myshell-ai/MeloTTS.git@main \
+    && pip3 install git+https://github.com/myshell-ai/OpenVoice.git@main \
+    && pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu \
+    && pip3 install --no-cache-dir gradio==3.48.0 \
+    && git clone https://huggingface.co/myshell-ai/OpenVoiceV2 \
+    && git clone https://huggingface.co/myshell-ai/OpenVoice \
+    && pip3 install --no-cache-dir -r requirements.txt \
+    && ln -s /app/OpenVoiceV2 /app/OpenVoice/checkpoints_v2 \
+    && pip3 uninstall nvidia-nvtx-cu12 nvidia-nvjitlink-cu12 nvidia-nccl-cu12 nvidia-curand-cu12 nvidia-cufft-cu12 nvidia-cuda-runtime-cu12 nvidia-cuda-nvrtc-cu12 nvidia-cuda-cupti-cu12 nvidia-cublas-cu12 \
+    && pip3 cache purge \
+    && apt-get autoremove \
+    && apt-get clean \
+    && apt-get autoclean \
+    && python -m unidic download
 
 EXPOSE 5000
 

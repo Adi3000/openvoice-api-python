@@ -1,6 +1,5 @@
 import logging, colorlog, os, traceback, base64
 from quart import Quart, request, send_file, Response, redirect
-from quart_cors import cors
 from time import time
 from dotenv import load_dotenv
 from models.Response import Response as ApiResponse
@@ -28,7 +27,6 @@ BASE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
 # Initialize Quart app
 app = Quart(__name__)
-app = cors(app, allow_origin="*")
 
 # Configure colored logging
 handler = colorlog.StreamHandler()
@@ -110,6 +108,9 @@ def log_request_info():
 
 @app.after_request
 def add_header(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     if hasattr(request, "start_time"):
         elapsed_time = time() - request.start_time
         response.headers["X-Elapsed-Time"] = str(elapsed_time)
@@ -194,7 +195,7 @@ async def generate_audio(version, args=None, source_file=None):
 
     if args is None:
         args = dict(await request.get_json())
-    validation_result = await ApiRequest.validate_generate_audio_request(args, version)
+    validation_result = ApiRequest.validate_generate_audio_request(args, version)
 
     if validation_result:
         app.logger.debug(f" > Validator error: {validation_result}")
@@ -203,7 +204,7 @@ async def generate_audio(version, args=None, source_file=None):
     try:
 
         if version == "v1":
-            validation_result = await ApiRequest.validate_generate_audio_v1_params(args)
+            validation_result = ApiRequest.validate_generate_audio_v1_params(args)
 
             if validation_result:
                 app.logger.debug(f" > Validator error: {validation_result}")
@@ -212,7 +213,7 @@ async def generate_audio(version, args=None, source_file=None):
                 )
 
             if source_file:
-                source_se = await Voice.build_source_se(args, version, DEVICE_V1)
+                source_se = Voice.build_source_se(args, version, DEVICE_V1)
                 prev_output_file = source_file
             else:
                 output_filename = Voice.generate_random_filename("", "wav")
@@ -226,7 +227,7 @@ async def generate_audio(version, args=None, source_file=None):
                 app.logger.debug(f" > Running v1 color converter...")
                 output_filename = Voice.generate_random_filename("", "wav")
                 output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
-                await Voice.convert(
+                Voice.convert(
                     src_file=prev_output_file,
                     output_file=output_file,
                     src_se=source_se,
@@ -235,7 +236,7 @@ async def generate_audio(version, args=None, source_file=None):
                 )
 
         elif version == "v2":
-            validation_result = await ApiRequest.validate_generate_audio_v2_params(args)
+            validation_result = ApiRequest.validate_generate_audio_v2_params(args)
 
             if validation_result:
                 app.logger.debug(f" > Validator error: {validation_result}")
@@ -244,12 +245,12 @@ async def generate_audio(version, args=None, source_file=None):
                 )
 
             if source_file:
-                source_se = await Voice.build_source_se(args, version, DEVICE_V2)
+                source_se = Voice.build_source_se(args, version, DEVICE_V2)
                 prev_output_file = source_file
             else:
                 output_filename = Voice.generate_random_filename("", "wav")
                 output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
-                source_se = await Voice.tts_v2(args, output_file, DEVICE_V2)
+                source_se = Voice.tts_v2(args, output_file, DEVICE_V2)
                 prev_output_file = output_file
 
             speaker = args.get("voice").lower()
@@ -258,7 +259,7 @@ async def generate_audio(version, args=None, source_file=None):
                 app.logger.debug(f" > Running v2 color converter...")
                 output_filename = Voice.generate_random_filename("", "wav")
                 output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
-                await Voice.convert(
+                Voice.convert(
                     src_file=prev_output_file,
                     output_file=output_file,
                     src_se=source_se,
