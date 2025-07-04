@@ -121,7 +121,7 @@ def add_header(response):
 @app.teardown_request
 def log_teardown(exception=None):
     if exception:
-        logger.error(f"Exception occurred: {exception}")
+        logger.error(f"Exception occurred: {exception}", exc_info=True)
     logger.debug(
         f"Finished processing {request.method} request from {request.remote_addr} => {request.url}"
     )
@@ -165,7 +165,7 @@ async def change_voice(version):
         app.logger.error(f" > Error: {str(e)}")
 
         if LOG_LEVEL == "DEBUG":
-            app.logger.error(traceback.format_exc())
+            app.logger.error("Track back for error %s", traceback.format_exc())
 
         payload_response = ApiResponse.payload(False, 500, "Internal Server Error")
         return await ApiResponse.output(payload_response, 500)
@@ -256,9 +256,9 @@ async def generate_audio(version, args=None, source_file=None):
             speaker = args.get("voice").lower()
 
             if speaker != "raw":
-                app.logger.debug(f" > Running v2 color converter...")
                 output_filename = Voice.generate_random_filename("", "wav")
                 output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
+                app.logger.debug(f" > Running v2 color converter for {output_file}...")
                 Voice.convert(
                     src_file=prev_output_file,
                     output_file=output_file,
@@ -279,6 +279,7 @@ async def generate_audio(version, args=None, source_file=None):
             protocol = request.scheme
             host = request.host
             output_url = f"{protocol}://{host}/audio-file/{output_filename}"
+            logger.info(f"End processing {output_url}")
             payload_response = ApiResponse.payload(
                 True, 200, "Successfully converted text to audio", {"url": output_url}
             )
@@ -288,6 +289,7 @@ async def generate_audio(version, args=None, source_file=None):
             output_path = f"{AUDIO_FILES_PATH}/{output_filename}"
             with open(output_path, "rb") as audio_file:
                 audio_bytes = audio_file.read()
+            logger.info(f"End processing {output_path}")
             return Response(audio_bytes, mimetype="audio/wav")
 
         elif response_format == "base64":
@@ -295,6 +297,7 @@ async def generate_audio(version, args=None, source_file=None):
             with open(output_path, "rb") as audio_file:
                 audio_bytes = audio_file.read()
             audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+            logger.info(f"End processing {output_path}")
             payload_response = ApiResponse.payload(
                 True,
                 200,
@@ -305,15 +308,7 @@ async def generate_audio(version, args=None, source_file=None):
 
         elif response_format == "stream":
             output_path = f"{AUDIO_FILES_PATH}/{output_filename}"
-
-            async def generate():
-                with open(output_path, "rb") as fwav:
-                    data = fwav.read(1024)
-                    while data:
-                        yield data
-                        data = fwav.read(1024)
-
-            return Response(generate(), mimetype="audio/wav")
+            return await stream_audio(audio_file_path)
 
         else:
             payload_response = ApiResponse.payload(
@@ -325,7 +320,7 @@ async def generate_audio(version, args=None, source_file=None):
         app.logger.error(f" > Error: {str(e)}")
 
         if LOG_LEVEL == "DEBUG":
-            app.logger.error(traceback.format_exc())
+            app.logger.error(traceback.format_exc(), )
 
         payload_response = ApiResponse.payload(False, 500, "Internal Server Error")
         return await ApiResponse.output(payload_response, 500)
@@ -361,6 +356,7 @@ async def stream_audio(file_path):
     try:
 
         async def generate():
+            logger.info(f"Streaming {file_path}")
             with open(file_path, "rb") as fwav:
                 data = fwav.read(1024)
                 while data:

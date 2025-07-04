@@ -66,6 +66,7 @@ def initialize_globals(app, logger, OPENVOICE_PATH, DEVICE_V1, DEVICE_V2, AUDIO_
             lang = lang.upper()
             models[lang] = TTS(language=lang, device=DEVICE_V2)
             speaker_ids[lang] = models[lang].hps.data.spk2id
+            logger.info(" > Model Language v2 %s loaded: ", lang)
 
     # Load speakers
     for speaker in SPEAKERS:

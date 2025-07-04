@@ -1,32 +1,36 @@
-FROM nvcr.io/nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.6.3-base-ubuntu24.04
 
-RUN apt-get update \ 
-    && apt-get install -y git git-lfs curl python3 python3-pip ffmpeg libmagic1 \
+RUN apt-get update \
+    && apt-get -qq install -y software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get -qq update \
+    && apt-get remove -y software-properties-common \
+    && DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -qq install --no-install-recommends -y git git-lfs curl python3.11 python3.11-venv ffmpeg libmagic1 \
     && curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
     && git lfs install \
-    && rm cuda-keyring_1.0-1_all.deb \
-    && ln -s /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir app
+    && mkdir app \
+    && python3.11 -m venv /app/.venv
 
 WORKDIR /app
 
-RUN pip3 install --no-cache-dir git+https://github.com/myshell-ai/MeloTTS.git@main \
- && pip3 install --no-cache-dir git+https://github.com/myshell-ai/OpenVoice.git@main \
- && pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 \
- && pip3 install --no-cache-dir 'nvidia-cudnn-cu11<9.0.0' --index-url https://download.pytorch.org/whl/nightly \
- && pip3 install --no-cache-dir gradio==3.48.0 \
+ENV PATH /app/.venv/bin:$PATH
+
+RUN /app/.venv/bin/pip install -U pip setuptools \
+ && /app/.venv/bin/pip install --no-cache-dir git+https://github.com/myshell-ai/MeloTTS.git@main \
+ && python -m unidic download \
+ && /app/.venv/bin/pip install --no-cache-dir git+https://github.com/Adi3000/OpenVoice.git@main \
+ && /app/.venv/bin/pip install --no-cache-dir torch==2.7.1+cu126 torchaudio==2.7.1+cu126 --index-url https://download.pytorch.org/whl/cu126 \
  && git clone --depth=1 https://huggingface.co/myshell-ai/OpenVoiceV2 \
  && git clone --depth=1 https://huggingface.co/myshell-ai/OpenVoice \
  && ln -s /app/OpenVoiceV2 /app/OpenVoice/checkpoints_v2 \
- && python -m unidic download
+ && /app/.venv/bin/pip install nvidia-cublas-cu12 nvidia-cudnn-cu12==9.*
 
+ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/app/.venv/lib/python3.11/site-packages/nvidia/cublas/lib:/app/.venv/lib/python3.11/site-packages/nvidia/cudnn/lib
 
 COPY . /app
 
-RUN pip3 install --no-cache-dir -r requirements.txt
-
+RUN /app/.venv/bin/pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 5000
-
-ENTRYPOINT ["python3","app.py"]
+ENTRYPOINT ["/app/.venv/bin/python3","app.py"]
