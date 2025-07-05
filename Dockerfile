@@ -10,7 +10,9 @@ RUN apt-get update \
     && git lfs install \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir app \
+    && apt-get autoremove -y \
     && python3.11 -m venv /app/.venv
+
 
 WORKDIR /app
 
@@ -19,11 +21,13 @@ ENV PATH /app/.venv/bin:$PATH
 RUN /app/.venv/bin/pip install -U pip setuptools \
  && /app/.venv/bin/pip install --no-cache-dir git+https://github.com/myshell-ai/MeloTTS.git@main \
  && python -m unidic download \
+ && /app/.venv/bin/pip install --no-cache-dir librosa==0.11.0 \
  && /app/.venv/bin/pip install --no-cache-dir git+https://github.com/Adi3000/OpenVoice.git@main \
  && /app/.venv/bin/pip install --no-cache-dir torch==2.7.1+cu126 torchaudio==2.7.1+cu126 --index-url https://download.pytorch.org/whl/cu126 \
  && git clone --depth=1 https://huggingface.co/myshell-ai/OpenVoiceV2 \
  && git clone --depth=1 https://huggingface.co/myshell-ai/OpenVoice \
  && ln -s /app/OpenVoiceV2 /app/OpenVoice/checkpoints_v2 \
+ && /app/.venv/bin/pip cache purge \
  && /app/.venv/bin/pip install nvidia-cublas-cu12 nvidia-cudnn-cu12==9.*
 
 ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/app/.venv/lib/python3.11/site-packages/nvidia/cublas/lib:/app/.venv/lib/python3.11/site-packages/nvidia/cudnn/lib

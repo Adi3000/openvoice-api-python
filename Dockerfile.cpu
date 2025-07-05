@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 ENV USE_VAD=true
 ENV DEVICE_V1=cpu
@@ -14,21 +14,23 @@ RUN apt-get update \
     && git lfs install \
     && ln -s /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/* \
-    && pip3 install git+https://github.com/myshell-ai/MeloTTS.git@main \
-    && pip3 install git+https://github.com/myshell-ai/OpenVoice.git@main \
-    && pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu \
-    && pip3 install --no-cache-dir gradio==3.48.0 \
+    && python3.11 -m venv /app/.venv
+    && /app/.venv/bin/pip install --no-cache-dir git+https://github.com/myshell-ai/MeloTTS.git@main \
+    && /app/.venv/bin/pip install --no-cache-dir librosa==0.11.0 \
+    && /app/.venv/bin/pip install --no-cache-dir git+https://github.com/Adi3000/OpenVoice.git@main \
+    && /app/.venv/bin/pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu \
     && git clone https://huggingface.co/myshell-ai/OpenVoiceV2 \
     && git clone https://huggingface.co/myshell-ai/OpenVoice \
-    && pip3 install --no-cache-dir -r requirements.txt \
+    && /app/.venv/bin/pip install --no-cache-dir -r requirements.txt \
     && ln -s /app/OpenVoiceV2 /app/OpenVoice/checkpoints_v2 \
-    && pip3 uninstall nvidia-nvtx-cu12 nvidia-nvjitlink-cu12 nvidia-nccl-cu12 nvidia-curand-cu12 nvidia-cufft-cu12 nvidia-cuda-runtime-cu12 nvidia-cuda-nvrtc-cu12 nvidia-cuda-cupti-cu12 nvidia-cublas-cu12 \
-    && pip3 cache purge \
+    && /app/.venv/bin/pip uninstall nvidia-nvtx-cu12 nvidia-nvjitlink-cu12 nvidia-nccl-cu12 nvidia-curand-cu12 nvidia-cufft-cu12 nvidia-cuda-runtime-cu12 nvidia-cuda-nvrtc-cu12 nvidia-cuda-cupti-cu12 nvidia-cublas-cu12 \
+    && /app/.venv/bin/pip cache purge \
     && apt-get autoremove \
     && apt-get clean \
     && apt-get autoclean \
-    && python -m unidic download
+    && /app/.venv/bin/python -m unidic download
 
+ENV PATH /app/.venv/bin:$PATH
 EXPOSE 5000
 
 ENTRYPOINT ["python3","app.py"]
