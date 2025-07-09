@@ -1,11 +1,12 @@
 import logging, colorlog, os, traceback, base64
-from quart import Quart, request, send_file, Response, redirect
+from quart import Quart, request, send_file, Response, redirect, json
 from time import time
 from dotenv import load_dotenv
 from models.Response import Response as ApiResponse
 from models.Request import Request as ApiRequest
 from models.Voice import Voice
 from init import initialize_globals
+import asyncio
 
 load_dotenv()
 
@@ -21,6 +22,7 @@ WATERMARK = os.getenv("WATERMARK", "@OpenVoiceAPI")
 DEVICE_V1 = os.getenv("DEVICE_V1", "cuda:0")
 DEVICE_V2 = os.getenv("DEVICE_V2", "cuda:0")
 SUPPORTED_STYLES_V1 = os.getenv("SUPPORTED_STYLES_V1", "English").split(",")
+WARM_UP = os.getenv("WARM_UP", False)
 USE_VAD = os.getenv("USE_VAD", False)
 OPENVOICE_PATH = "/app/OpenVoice"
 BASE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
@@ -205,72 +207,21 @@ async def generate_audio(version, args=None, source_file=None):
 
         if version == "v1":
             validation_result = ApiRequest.validate_generate_audio_v1_params(args)
-
-            if validation_result:
-                app.logger.debug(f" > Validator error: {validation_result}")
-                return await ApiResponse.output(
-                    validation_result, validation_result["code"]
-                )
-
-            if source_file:
-                source_se = Voice.build_source_se(args, version, DEVICE_V1)
-                prev_output_file = source_file
-            else:
-                output_filename = Voice.generate_random_filename("", "wav")
-                output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
-                source_se = await Voice.tts_v1(args, output_file, DEVICE_V1)
-                prev_output_file = output_file
-
-            speaker = args.get("voice").lower()
-
-            if speaker != "raw":
-                app.logger.debug(f" > Running v1 color converter...")
-                output_filename = Voice.generate_random_filename("", "wav")
-                output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
-                Voice.convert(
-                    src_file=prev_output_file,
-                    output_file=output_file,
-                    src_se=source_se,
-                    tgt_se=targets_v1[speaker],
-                    converter=tone_color_converter_v1,
-                )
-
         elif version == "v2":
             validation_result = ApiRequest.validate_generate_audio_v2_params(args)
-
-            if validation_result:
-                app.logger.debug(f" > Validator error: {validation_result}")
-                return await ApiResponse.output(
-                    validation_result, validation_result["code"]
-                )
-
-            if source_file:
-                source_se = Voice.build_source_se(args, version, DEVICE_V2)
-                prev_output_file = source_file
-            else:
-                output_filename = Voice.generate_random_filename("", "wav")
-                output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
-                source_se = Voice.tts_v2(args, output_file, DEVICE_V2)
-                prev_output_file = output_file
-
-            speaker = args.get("voice").lower()
-
-            if speaker != "raw":
-                output_filename = Voice.generate_random_filename("", "wav")
-                output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
-                app.logger.debug(f" > Running v2 color converter for {output_file}...")
-                Voice.convert(
-                    src_file=prev_output_file,
-                    output_file=output_file,
-                    src_se=source_se,
-                    tgt_se=targets_v2[speaker],
-                    converter=tone_color_converter_v2,
-                )
         else:
             error_message = f" > Version {version} not supported"
             app.logger.error(error_message)
             payload_response = ApiResponse.payload(False, 400, error_message)
             return await ApiResponse.output(payload_response, 400)
+
+        if validation_result:
+            app.logger.debug(f" > Validator error: {validation_result}")
+            return await ApiResponse.output(
+                validation_result, validation_result["code"]
+            )
+            
+        output_filename = await convert(version=version, args=args, source_file=source_file)
 
         raw_response_format = args.get("response_format")
         response_format = raw_response_format.lower()
@@ -385,6 +336,66 @@ async def page_not_found(error):
     return await ApiResponse.output(payload_response, 404)
 
 
+def warming_up_voices():
+    for speaker in SPEAKERS: 
+        for lang in MODEL_LANGUAGES_V1 :
+            logger.info(f"Not warming up V1 for {lang} with {speaker} model yet, no info about styles")
+        for lang in MODEL_LANGUAGES_V2 :
+            logger.info(f"warming up v2 for {lang} with {speaker}")
+            args = json.dumps({
+                'model': lang,
+                'input': "warming up voice",
+                'speed': 1.0,
+                'response_format': "bytes",
+                'voice': speaker
+            })
+            asyncio.run(convert("v2", json.loads(args)))
+
+async def convert(version=None, args=None, source_file=None):
+    targets = None
+    tone_color_converter = None
+    device = None
+    source_se = None
+    if version == "v1":
+        targets = targets_v1
+        tone_color_converter = tone_color_converter_v1
+        device = DEVICE_V1
+    elif version == "v2":
+        targets = targets_v2
+        tone_color_converter = tone_color_converter_v2
+        device = DEVICE_V2
+
+
+    if source_file:
+        source_se = Voice.build_source_se(args, version, device)
+        prev_output_file = source_file
+    else:
+        output_filename = Voice.generate_random_filename("", "wav")
+        output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
+        if version == "v1":
+            source_se = await Voice.tts_v1(args, output_file, device)
+        elif  version == "v2":
+            source_se = Voice.tts_v2(args, output_file, device)
+        prev_output_file = output_file
+
+    speaker = args.get("voice").lower()
+
+    if speaker != "raw":
+        app.logger.debug(f" > Running %s color converter...", version)
+        output_filename = Voice.generate_random_filename("", "wav")
+        output_file = f"{AUDIO_FILES_PATH}/{output_filename}"
+        Voice.convert(
+            src_file=prev_output_file,
+            output_file=output_file,
+            src_se=source_se,
+            tgt_se=targets[speaker],
+            converter=tone_color_converter,
+        )
+    return output_filename
+
+
 # Run the app
 if __name__ == "__main__":
+    if WARM_UP:
+        warming_up_voices()
     app.run(host=SERVER_ADDRESS, port=SERVER_PORT, debug=True)
